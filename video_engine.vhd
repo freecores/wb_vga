@@ -8,8 +8,8 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 
-library work;
-use work.technology.all;
+library wb_tk;
+use wb_tk.technology.all;
 
 entity video_engine is
 	generic (

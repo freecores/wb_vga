@@ -10,8 +10,8 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
-library work;
-use work.technology.all;
+library wb_tk;
+use wb_tk.technology.all;
 
 entity sync_gen is
 	port (

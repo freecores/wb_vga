@@ -8,8 +8,8 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 
-library work;
-use work.technology.all;
+library wb_tk;
+use wb_tk.technology.all;
 
 entity mem_reader is
 	generic (
@@ -190,7 +190,7 @@ begin
 		end if;
 		v_mem_addr <= pixel_cnt;
 	end process;
-	v_mem_rd <= not video_fifo_full;
+	v_mem_rd <= (not video_fifo_full) and (not reset);
 
 	-- Pixel data output state machine.
 	pixel_output: process is
