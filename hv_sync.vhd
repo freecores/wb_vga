@@ -1,7 +1,7 @@
 --
 --  Horizontal and vertical sync generator.
 --
---  (c) Copyright Andras Tantos <andras_tantos@yahoo.com> 2001/03/31
+--  (c) Copyright Andras Tantos <tantos@opencores.org> 2001/03/31
 --  This code is distributed under the terms and conditions of the GNU General Public Lince.
 --
 
