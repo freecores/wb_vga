@@ -22,7 +22,6 @@ entity accel is
 	generic (
 		accel_size: positive := 9;
 		video_addr_width: positive := 20;
-		video_data_width: positive := 16;
 		data_width: positive := 16
 	);
 	port (
@@ -49,11 +48,12 @@ entity accel is
 		-- Master interface to the video memory side.		
 		v_we_o: out std_logic;
 		v_cyc_o: out std_logic;
-		v_sel_o: out std_logic;
+		v_stb_o: out std_logic;
 
 		v_adr_o: out std_logic_vector (video_addr_width-1 downto 0);
-		v_dat_o: out std_logic_vector (video_data_width-1 downto 0);
-		v_dat_i: in std_logic_vector (video_data_width-1 downto 0);
+        v_sel_o: out std_logic_vector ((data_width/8)-1 downto 0);
+		v_dat_o: out std_logic_vector (data_width-1 downto 0);
+		v_dat_i: in std_logic_vector (data_width-1 downto 0);
 		
 		v_ack_i: in std_logic
 	);
@@ -125,7 +125,9 @@ begin
 	accel_ram_stb <= acc_stb_i or mem_stb_i;
 	accel_ram_we <= we_i and acc_stb_i;
 	accel_ram_clk <= clk_i;
-	accel_ram_dat_i(min(video_addr_width,data_width)-1 downto 0) <= dat_i;
+	accel_ram_dat_i(min2(video_addr_width-1
+	,data_width-1) downto 0) <= 
+	    dat_i(min2(video_addr_width,data_width) - 1 downto 0);
 	high_accel_dat_gen: if (video_addr_width > data_width) generate
 		accel_ram_dat_i(video_addr_width-1 downto data_width) <= ext_value;
 	end generate;
@@ -145,7 +147,7 @@ begin
 			ack_o => accel_ram_ack
 		);
 
-	v_sel_o <= mem_stb_i;
+	v_stb_o <= mem_stb_i;
 	v_cyc_o <= mem_stb_i and cyc_i;
 	v_adr_o <= cursor;
 	v_we_o <= we_i;
@@ -164,7 +166,7 @@ begin
 			port map (
 				clk_i => clk_i,
 				rst_i => rst_i,
-				rst_val => (others => '0'),
+				rst_val => (video_addr_width - data_width-1 downto 0 => '0'),
 		
 		        cyc_i => cyc_i,
 				stb_i => ext_stb_i,
@@ -188,10 +190,15 @@ begin
 	end generate;
 
 	cur_reg: wb_io_reg
+		generic map (
+			width => video_addr_width,
+			bus_width => data_width,
+			offset => 0
+		)
 		port map (
 			clk_i => clk_i,
 			rst_i => rst_i,
-			rst_val => (others => '0'),
+			rst_val => (video_addr_width-1 downto 0 => '0'),
 	
 	        cyc_i => cyc_i,
 			stb_i => cur_stb_i,
@@ -210,11 +217,20 @@ begin
 
 	cur_update <= mem_stb_i and cyc_i and v_ack_i;
 
+    v_sel_o <= sel_i;
 	gen_dat_o: for i in dat_o'RANGE generate
-		mem_dat_o(i) <= (
-			(cyc_i and ((accel_ram_d_out(i) and acc_stb_i) or (v_dat_i(i) and mem_stb_i))) or 
-			(dat_oi(i) and ((not (acc_stb_i or mem_stb_i or cur_stb_i)) or (not cyc_i)))
-		);
+        gen_dat_o1: if (i < video_addr_width) generate
+    		mem_dat_o(i) <= (
+    			(cyc_i and ((accel_ram_d_out(i) and acc_stb_i) or (v_dat_i(i) and mem_stb_i))) or 
+    			(dat_oi(i) and ((not (acc_stb_i or mem_stb_i or cur_stb_i)) or (not cyc_i)))
+    		);
+    	end generate;
+        gen_dat_o2: if (i >= video_addr_width) generate
+    		mem_dat_o(i) <= (
+    			(cyc_i and (('0' and acc_stb_i) or (v_dat_i(i) and mem_stb_i))) or 
+    			(dat_oi(i) and ((not (acc_stb_i or mem_stb_i or cur_stb_i)) or (not cyc_i)))
+    		);
+    	end generate;
 	end generate;
 	mem_ack_o <= (
 		(cyc_i and ((accel_ram_ack and acc_stb_i) or (v_ack_i and mem_stb_i))) or 

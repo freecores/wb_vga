@@ -10,11 +10,6 @@ use wb_vga.all;
 use wb_vga.constants.all;
 
 entity vga_chip_tb is
-	-- Generic declarations of the tested unit
-	generic(
-		v_mem_width : POSITIVE := 16;
-		fifo_size : POSITIVE := 256;
-		v_addr_width : POSITIVE := 20 );
 end vga_chip_tb;
 
 architecture TB of vga_chip_tb is
@@ -89,28 +84,29 @@ architecture TB of vga_chip_tb is
 	signal blank : std_logic;
 	signal video_out : std_logic_vector(7 downto 0);
 
-	constant reg_total0        : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000000";
-	constant reg_total1        : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000001";
-	constant reg_total2        : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000010";
-	constant reg_total3        : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000011";
-	constant reg_ofs0          : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000100";
-	constant reg_ofs1          : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000101";
-	constant reg_ofs2          : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000110";
-	constant reg_ofs3          : std_logic_vector(v_addr_width downto 0) :=  "000000000000000000111";
-	constant reg_ws            : std_logic_vector(v_addr_width downto 0) :=  "000000000000000001000";
+	constant reg_total0        : integer :=  0;
+	constant reg_total1        : integer :=  1;
+	constant reg_total2        : integer :=  2;
+	constant reg_total3        : integer :=  3;
+	constant reg_ofs0          : integer :=  4;
+	constant reg_ofs1          : integer :=  5;
+	constant reg_ofs2          : integer :=  6;
+	constant reg_ofs3          : integer :=  7;
 	
-	constant reg_fifo_treshold : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010000";
-	constant reg_bpp           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010001";
-	constant reg_hbs           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010010";
-	constant reg_hss           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010011";
-	constant reg_hse           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010100";
-	constant reg_htotal        : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010101";
-	constant reg_vbs           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010110";
-	constant reg_vss           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000010111";
-	constant reg_vse           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000011000";
-	constant reg_vtotal        : std_logic_vector(v_addr_width downto 0) :=  "000000000000000011001";
-	constant reg_pps           : std_logic_vector(v_addr_width downto 0) :=  "000000000000000011010";
-	constant reg_sync_pol      : std_logic_vector(v_addr_width downto 0) :=  "000000000000000011011";
+	constant reg_fifo_treshold : integer :=  16;
+	constant reg_bpp           : integer :=  17;
+	constant reg_hbs           : integer :=  18;
+	constant reg_hss           : integer :=  19;
+	constant reg_hse           : integer :=  20;
+	constant reg_htotal        : integer :=  21;
+	constant reg_vbs           : integer :=  22;
+	constant reg_vss           : integer :=  23;
+	constant reg_vse           : integer :=  24;
+	constant reg_vtotal        : integer :=  25;
+	constant reg_pps           : integer :=  26;
+	constant reg_sync_pol      : integer :=  27;
+
+	constant reg_ws            : integer :=  32;
 	
 	constant val_total0        : std_logic_vector(7 downto 0) :=  "00001111";
 	constant val_total1        : std_logic_vector(7 downto 0) :=  "00000000";
@@ -120,7 +116,6 @@ architecture TB of vga_chip_tb is
 	constant val_ofs1          : std_logic_vector(7 downto 0) :=  "00000000";
 	constant val_ofs2          : std_logic_vector(7 downto 0) :=  "00000000";
 	constant val_ofs3          : std_logic_vector(7 downto 0) :=  "00000000";
-	constant val_ws            : std_logic_vector(7 downto 0) :=  "00000010";
 	constant val_fifo_treshold : std_logic_vector(7 downto 0) :=  "00000011";
 	constant val_bpp           : std_logic_vector(7 downto 0) :=  "00000011";
 	constant val_hbs           : std_logic_vector(7 downto 0) :=  "00000111";
@@ -133,6 +128,7 @@ architecture TB of vga_chip_tb is
 	constant val_vtotal        : std_logic_vector(7 downto 0) :=  "00000100";
 	constant val_pps           : std_logic_vector(7 downto 0) :=  "00000001";
 	constant val_sync_pol      : std_logic_vector(7 downto 0) :=  "10000000";
+	constant val_ws            : std_logic_vector(7 downto 0) :=  "00000010";
 	
 begin
 
@@ -198,34 +194,69 @@ begin
 		wait until clk_i'EVENT and clk_i = '1';
 		wait until clk_i'EVENT and clk_i = '1';
 		wait until clk_i'EVENT and clk_i = '1';
-		
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total0            ,val_total0);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total1            ,val_total1);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total2            ,val_total2);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total3            ,val_total3);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs0              ,val_ofs0);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs1              ,val_ofs1);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs2              ,val_ofs2);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs3              ,val_ofs3);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ws                ,val_ws);
-		
-		wait until clk_i'EVENT and clk_i = '1';
-		wait until clk_i'EVENT and clk_i = '1';
-		wait until clk_i'EVENT and clk_i = '1';
-		wait until clk_i'EVENT and clk_i = '1';
 
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_fifo_treshold     ,val_fifo_treshold);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_bpp               ,val_bpp);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hbs               ,val_hbs);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hss               ,val_hss);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hse               ,val_hse);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_htotal            ,val_htotal);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vbs               ,val_vbs);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vss               ,val_vss);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vse               ,val_vse);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vtotal            ,val_vtotal);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_pps               ,val_pps);
-		wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_sync_pol          ,val_sync_pol);
+		if (cpu_dat_width = 8) then 	
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total0            ,val_total0);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total1            ,val_total1);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total2            ,val_total2);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total3            ,val_total3);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs0              ,val_ofs0);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs1              ,val_ofs1);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs2              ,val_ofs2);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs3              ,val_ofs3);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ws                ,val_ws);
+			
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+	
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_fifo_treshold     ,val_fifo_treshold);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_bpp               ,val_bpp);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hbs               ,val_hbs);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hss               ,val_hss);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hse               ,val_hse);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_htotal            ,val_htotal);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vbs               ,val_vbs);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vss               ,val_vss);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vse               ,val_vse);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vtotal            ,val_vtotal);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_pps               ,val_pps);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_sync_pol          ,val_sync_pol);
+		end if;
+		if (cpu_dat_width = 16) then
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total0/2 ,val_total1 & val_total0);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total2/2 ,val_total3 & val_total2);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs0/2   ,val_ofs1 & val_ofs0);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs2/2   ,val_ofs3 & val_ofs2);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ws/2     ,"00000000" & val_ws );
+			
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+	
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_fifo_treshold/2 ,val_bpp & val_fifo_treshold);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hbs/2           ,val_hss & val_hbs);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hse/2           ,val_htotal & val_hse);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vbs/2           ,val_vss & val_vbs);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vse/2           ,val_vtotal & val_vse);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_pps/2           ,val_sync_pol & val_pps);
+		end if;
+		if (cpu_dat_width = 32) then
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_total0/4 ,val_total3 & val_total2 & val_total1 & val_total0);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ofs0/4   ,val_ofs3 & val_ofs2 & val_ofs1 & val_ofs0);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_ws/4     ,"000000000000000000000000" & val_ws );
+			
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+			wait until clk_i'EVENT and clk_i = '1';
+	
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_fifo_treshold/4 ,val_hss & val_hbs & val_bpp & val_fifo_treshold);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_hse/4           ,val_vss & val_vbs & val_htotal & val_hse);
+			wr_chk_val(clk_i, adr_i,dat_o,dat_i,we_i,cyc_i,reg_stb_i,ack_o,reg_vse/4           ,val_sync_pol & val_pps & val_vtotal & val_vse);
+		end if;
 
 		wait;
 	end process;
@@ -235,7 +266,7 @@ begin
 		wait on s_data,s_addr,s_oen,s_wrhn,s_wrln,s_cen;
 		if (s_cen = '0') then
 			if (s_oen = '0') then
-				s_data <= s_addr(v_mem_width-1 downto 0);
+				s_data <= s_addr(v_dat_width-1 downto 0);
 			elsif (s_wrhn = '0' or s_wrln = '0') then
 				if (s_wrhn = '0') then
 				else

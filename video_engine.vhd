@@ -23,7 +23,8 @@ entity video_engine is
 		clk_en: in std_logic := '1';
 		reset: in std_logic := '0';
 		
-		total: in std_logic_vector(v_addr_width-1 downto 0);   -- total video memory size in bytes 7..0
+		v_mem_end: in std_logic_vector(v_addr_width-1 downto 0);   -- video memory end address in words
+		v_mem_start: in std_logic_vector(v_addr_width-1 downto 0) := (others => '0'); -- video memory start adderss in words
 		fifo_treshold: in std_logic_vector(7 downto 0);        -- priority change threshold
 		bpp: in std_logic_vector(1 downto 0);                  -- number of bits makes up a pixel valid values: 1,2,4,8
 		multi_scan: in std_logic_vector(1 downto 0);           -- number of repeated scans
@@ -96,7 +97,8 @@ architecture video_engine of video_engine is
 			pix_clk_en: in std_logic;
 			reset: in std_logic := '0';
 			
-			total: in std_logic_vector(v_addr_width-1 downto 0);   -- total video memory size in bytes 7..0
+    		v_mem_end: in std_logic_vector(v_addr_width-1 downto 0);   -- video memory end address in words
+	    	v_mem_start: in std_logic_vector(v_addr_width-1 downto 0) := (others => '0'); -- video memory start adderss in words
 			fifo_treshold: in std_logic_vector(7 downto 0);        -- priority change threshold
 			bpp: in std_logic_vector(1 downto 0);                  -- number of bits makes up a pixel valid values: 1,2,4,8
 			multi_scan: in std_logic_vector(1 downto 0);           -- number of repeated scans
@@ -159,7 +161,8 @@ begin
 			clk_en => clk_en,
 			pix_clk_en => pix_clk_en,
 			reset => reset,
-			total => total,
+    		v_mem_end => v_mem_end,
+		    v_mem_start => v_mem_start,
 			fifo_treshold => fifo_treshold,
 			bpp => bpp,
 			multi_scan => multi_scan,

@@ -72,4 +72,5 @@ compile_file video_engine.vhd
 compile_file accel.vhd
 compile_file palette.vhd
 compile_file vga_core.vhd
+compile_file vga_core_v2.vhd
 compile_file vga_chip.vhd

@@ -11,8 +11,9 @@ use IEEE.std_logic_1164.all;
 package constants is
     constant v_dat_width: positive := 16;
     constant v_adr_width : positive := 20;
-    constant cpu_dat_width: positive := 8;
-    constant cpu_adr_width: positive := 21;
+    constant cpu_dat_width: positive := 32;
+    constant cpu_adr_width: positive := 19;
+    constant reg_adr_width: positive := 5;
     constant fifo_size: positive := 256;
 --	constant addr_diff: integer := log2(cpu_dat_width/v_dat_width);
 end constants;
@@ -34,20 +35,17 @@ entity vga_chip is
 	port (
 		clk_i: in std_logic;
 		clk_en: in std_logic := '1';
-		rst_i: in std_logic := '0';
+		rstn: in std_logic := '1';
 
 		-- CPU bus interface
-		dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
-		dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
-		dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
-		cyc_i: in std_logic;
-		ack_o: out std_logic;
-		ack_oi: in std_logic;
-		we_i: in std_logic;
-		vmem_stb_i: in std_logic;
-		reg_stb_i: in std_logic;
-		adr_i: in std_logic_vector (cpu_adr_width-1 downto 0);
-        sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
+		data: inout std_logic_vector (cpu_dat_width-1 downto 0) := (others => 'Z');
+		addr: in std_logic_vector (cpu_adr_width-1 downto 0) := (others => 'U');
+		rdn: in std_logic := '1';
+		wrn: in std_logic := '1';
+		vmem_cen: in std_logic := '1';
+		reg_cen: in std_logic := '1';
+		byen: in std_logic_vector ((cpu_dat_width/8)-1 downto 0);
+		waitn: out std_logic;
 
 		-- video memory SRAM interface
 		s_data : inout std_logic_vector(v_dat_width-1 downto 0);
@@ -104,35 +102,76 @@ architecture vga_chip of vga_chip is
 	);
 	end component;
 
+    component wb_async_master
+	generic (
+		width: positive := 16;
+		addr_width: positive := 20
+	);
+	port (
+		clk_i: in std_logic;
+		rst_i: in std_logic := '0';
+		
+		-- interface to wb slave devices
+		s_adr_o: out std_logic_vector (addr_width-1 downto 0);
+		s_sel_o: out std_logic_vector ((width/8)-1 downto 0);
+		s_dat_i: in std_logic_vector (width-1 downto 0);
+		s_dat_o: out std_logic_vector (width-1 downto 0);
+		s_cyc_o: out std_logic;
+		s_ack_i: in std_logic;
+		s_err_i: in std_logic := '-';
+		s_rty_i: in std_logic := '-';
+		s_we_o: out std_logic;
+		s_stb_o: out std_logic;
+
+		-- interface to asyncron master device
+		a_data: inout std_logic_vector (width-1 downto 0) := (others => 'Z');
+		a_addr: in std_logic_vector (addr_width-1 downto 0) := (others => 'U');
+		a_rdn: in std_logic := '1';
+		a_wrn: in std_logic := '1';
+		a_cen: in std_logic := '1';
+		a_byen: in std_logic_vector ((width/8)-1 downto 0);
+		a_waitn: out std_logic
+	);
+    end component;
+
 	component vga_core
     	generic (
-    		-- cannot be overwritten at the moment...
     		v_dat_width: positive := 16;
     		v_adr_width : positive := 20;
-    		cpu_dat_width: positive := 8;
-    		cpu_adr_width: positive := 21;
+    		cpu_dat_width: positive := 16;
+    		cpu_adr_width: positive := 20;
+    		reg_adr_width: positive := 20;
     		fifo_size: positive := 256
     	);
     	port (
     		clk_i: in std_logic;
     		clk_en: in std_logic := '1';
     		rst_i: in std_logic := '0';
-
-    		-- CPU bus interface
-    		cyc_i: in std_logic;
-    		we_i: in std_logic;
+    
+    		-- CPU memory bus interface
+    		vmem_cyc_i: in std_logic;
+    		vmem_we_i: in std_logic;
     		vmem_stb_i: in std_logic;   -- selects video memory
-        	total_stb_i: in std_logic;    -- selects total register
-        	ofs_stb_i: in std_logic;      -- selects offset register
-        	reg_bank_stb_i: in std_logic; -- selects all other registers (in a single bank)
-    		ack_o: out std_logic;
-    		ack_oi: in std_logic;
-    		adr_i: in std_logic_vector (v_adr_width downto 0);
-            sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
-    		dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
-    		dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
-    		dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
-
+    		vmem_ack_o: out std_logic;
+    		vmem_ack_oi: in std_logic;
+    		vmem_adr_i: in std_logic_vector (cpu_adr_width-1 downto 0);
+            vmem_sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
+    		vmem_dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
+    		vmem_dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
+    		vmem_dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
+    
+    		-- CPU register bus interface
+    		reg_cyc_i: in std_logic;
+    		reg_we_i: in std_logic;
+        	reg_stb_i: in std_logic;    -- selects configuration registers
+    		reg_ack_o: out std_logic;
+    		reg_ack_oi: in std_logic;
+    		reg_adr_i: in std_logic_vector (reg_adr_width-1 downto 0);
+            reg_sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
+    		reg_dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
+    		reg_dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
+    		reg_dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
+    
     		-- video memory interface
     		v_adr_o: out std_logic_vector (v_adr_width-1 downto 0);
     		v_sel_o: out std_logic_vector ((v_dat_width/8)-1 downto 0);
@@ -142,7 +181,7 @@ architecture vga_chip of vga_chip is
     		v_ack_i: in std_logic;
     		v_we_o: out std_logic;
     		v_stb_o: out std_logic;
-
+    
     		-- sync blank and video signal outputs
     		h_sync: out std_logic;
     		h_blank: out std_logic;
@@ -180,9 +219,10 @@ architecture vga_chip of vga_chip is
 	);
 	end component;
 
-    signal total_stb: std_logic;
-    signal ofs_stb: std_logic;
-    signal reg_bank_stb: std_logic;
+    signal reg_ack_o: std_logic;
+    signal reg_dat_o: std_logic_vector(cpu_dat_width-1 downto 0);
+
+    signal reg_stb: std_logic;
     signal ws_stb: std_logic;
     signal wait_state: std_logic_vector(3 downto 0);
 
@@ -201,7 +241,29 @@ architecture vga_chip of vga_chip is
 	signal ws_ack_o: std_logic;
 	
 	signal s_wrn: std_logic;
+
+
+	signal dat_i: std_logic_vector (cpu_dat_width-1 downto 0);
+	signal dat_oi: std_logic_vector (cpu_dat_width-1 downto 0);
+	signal dat_o: std_logic_vector (cpu_dat_width-1 downto 0);
+	signal cyc_i: std_logic;
+	signal ack_o: std_logic;
+	signal ack_oi: std_logic;
+	signal we_i: std_logic;
+	signal vmem_stb_i: std_logic;
+	signal reg_stb_i: std_logic;
+	signal adr_i: std_logic_vector (cpu_adr_width-1 downto 0);
+	signal sel_i: std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
+	
+	signal cen: std_logic;
+	signal stb: std_logic;
+
+    signal rst_i: std_logic := '0';
+
+	constant vga_reg_size: integer := size2bits((32*8+cpu_dat_width-1)/cpu_dat_width);
 begin
+    rst_i <= not rstn;
+    
 	ws_reg: wb_out_reg
 		generic map( width => 4, bus_width => cpu_dat_width , offset => 0 )
 		port map(
@@ -221,26 +283,39 @@ begin
     		v_adr_width => v_adr_width,
     		cpu_dat_width => cpu_dat_width,
     		cpu_adr_width => cpu_adr_width,
+    		reg_adr_width => reg_adr_width,
     		fifo_size => fifo_size
     	)
 		port map (
     		clk_i => clk_i,
 		    clk_en => clk_en,
 		    rst_i => rst_i,
+
     		-- CPU bus interface
-    		cyc_i => cyc_i,
-		    we_i => we_i,
-		    vmem_stb_i => vmem_stb_i,
-		    total_stb_i => total_stb,
-		    ofs_stb_i => ofs_stb,
-		    reg_bank_stb_i => reg_bank_stb,
-		    ack_o => ack_o,
-		    ack_oi => ws_ack_o,
-		    adr_i => adr_i,
-		    sel_i => sel_i,
-    		dat_i => dat_i,
-		    dat_oi => ws_dat_o,
-		    dat_o => dat_o,
+    		vmem_cyc_i => cyc_i,
+    		vmem_we_i => we_i,
+    		vmem_stb_i => vmem_stb_i,
+    		vmem_ack_o => ack_o,
+    		vmem_ack_oi => reg_ack_o,
+    		vmem_adr_i => adr_i,
+            vmem_sel_i => sel_i,
+    		vmem_dat_i => dat_i,
+    		vmem_dat_oi => reg_dat_o,
+    		vmem_dat_o => dat_o,
+    
+    		-- CPU register bus interface
+    		reg_cyc_i => cyc_i,
+    		reg_we_i => we_i,
+        	reg_stb_i => reg_stb_i,
+    		reg_ack_o => reg_ack_o,
+    		reg_ack_oi => ack_oi,
+    		reg_adr_i => adr_i(reg_adr_width-1 downto 0),
+            reg_sel_i => sel_i,
+    		reg_dat_i => dat_i,
+    		reg_dat_oi => dat_oi,
+    		reg_dat_o => reg_dat_o,
+    
+
     		-- video memory interface
     		v_adr_o => v_adr_o,
     		v_sel_o => v_sel_o,
@@ -290,26 +365,52 @@ begin
 	s_wrln <= s_wrn or s_byen(0);
 	s_wrhn <= s_wrn or s_byen(1);
 
+    master: wb_async_master
+    	generic map (
+    		width => cpu_dat_width,
+    		addr_width => cpu_adr_width
+    	)
+    	port map (
+    		clk_i => clk_i,
+    		rst_i => rst_i,
+    		
+    		-- interface to wb slave devices
+    		s_adr_o => adr_i,
+    		s_sel_o => sel_i,
+    		s_dat_i => dat_o,
+    		s_dat_o => dat_i,
+    		s_cyc_o => cyc_i,
+    		s_ack_i => ack_o,
+    		s_err_i => '0',
+    		s_rty_i => '0',
+    		s_we_o => we_i,
+    		s_stb_o => stb,
+    
+    		-- interface to asyncron master device
+    		a_data => data,
+    		a_addr => addr,
+    		a_rdn => rdn,
+    		a_wrn => wrn,
+    		a_cen => cen,
+    		a_byen => byen,
+    		a_waitn => waitn
+    	);
 
+    cen <= vmem_cen and reg_cen;
+    vmem_stb_i <= stb and not vmem_cen;
+    reg_stb_i <= stb and not reg_cen;
+    
 	addr_decoder: process is
 	begin
 		wait on reg_stb_i, adr_i;
 
-        total_stb <= '0';
-        ofs_stb <= '0';
-        reg_bank_stb <= '0';
+        reg_stb <= '0';
         ws_stb <= '0';
 
 		if (reg_stb_i = '1') then
-			case (adr_i(4)) is
-				when '0' => 
-        			case (adr_i(3 downto 2)) is
-        				when "00" => total_stb <= '1';
-        				when "01" => ofs_stb <= '1';
-        				when "10" => ws_stb <= '1';
-        				when others => 
-        			end case;
-				when '1' => reg_bank_stb <= '1';
+			case (adr_i(vga_reg_size)) is
+				when '0' => reg_stb <= '1';
+				when '1' => ws_stb <= '1';
 				when others => 
 			end case;
 		end if;

@@ -17,11 +17,11 @@ use wb_vga.all;
 
 entity vga_core is
 	generic (
-		-- cannot be overwritten at the moment...
 		v_dat_width: positive := 16;
 		v_adr_width : positive := 20;
-		cpu_dat_width: positive := 8;
-		cpu_adr_width: positive := 21;
+		cpu_dat_width: positive := 16;
+		cpu_adr_width: positive := 20;
+		reg_adr_width: positive := 20;
 		fifo_size: positive := 256
 	);
 	port (
@@ -29,20 +29,29 @@ entity vga_core is
 		clk_en: in std_logic := '1';
 		rst_i: in std_logic := '0';
 
-		-- CPU bus interface
-		cyc_i: in std_logic;
-		we_i: in std_logic;
+		-- CPU memory bus interface
+		vmem_cyc_i: in std_logic;
+		vmem_we_i: in std_logic;
 		vmem_stb_i: in std_logic;   -- selects video memory
-    	total_stb_i: in std_logic;    -- selects total register
-    	ofs_stb_i: in std_logic;      -- selects offset register
-    	reg_bank_stb_i: in std_logic; -- selects all other registers (in a single bank)
-		ack_o: out std_logic;
-		ack_oi: in std_logic;
-		adr_i: in std_logic_vector (v_adr_width downto 0);
-        sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
-		dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
-		dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
-		dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
+		vmem_ack_o: out std_logic;
+		vmem_ack_oi: in std_logic;
+		vmem_adr_i: in std_logic_vector (cpu_adr_width-1 downto 0);
+        vmem_sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
+		vmem_dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
+		vmem_dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
+		vmem_dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
+
+		-- CPU register bus interface
+		reg_cyc_i: in std_logic;
+		reg_we_i: in std_logic;
+    	reg_stb_i: in std_logic;    -- selects configuration registers
+		reg_ack_o: out std_logic;
+		reg_ack_oi: in std_logic;
+		reg_adr_i: in std_logic_vector (reg_adr_width-1 downto 0);
+        reg_sel_i: in std_logic_vector ((cpu_dat_width/8)-1 downto 0) := (others => '1');
+		reg_dat_i: in std_logic_vector (cpu_dat_width-1 downto 0);
+		reg_dat_oi: in std_logic_vector (cpu_dat_width-1 downto 0);
+		reg_dat_o: out std_logic_vector (cpu_dat_width-1 downto 0);
 
 		-- video memory interface
 		v_adr_o: out std_logic_vector (v_adr_width-1 downto 0);
@@ -79,7 +88,8 @@ architecture vga_core of vga_core is
 			clk_en: in std_logic := '1';
 			reset: in std_logic := '0';
 
-			total: in std_logic_vector(v_addr_width-1 downto 0);   -- total video memory size in bytes 7..0
+    		v_mem_end: in std_logic_vector(v_addr_width-1 downto 0);   -- video memory end address in words
+	    	v_mem_start: in std_logic_vector(v_addr_width-1 downto 0) := (others => '0'); -- video memory start adderss in words
 			fifo_treshold: in std_logic_vector(7 downto 0);        -- priority change threshold
 			bpp: in std_logic_vector(1 downto 0);                  -- number of bits makes up a pixel valid values: 1,2,4,8
 			multi_scan: in std_logic_vector(1 downto 0);           -- number of repeated scans
@@ -182,10 +192,10 @@ architecture vga_core of vga_core is
 
 	component wb_bus_resize
 	generic (
-		m_bus_width: positive := 8; -- master bus width
-		m_addr_width: positive := 21; -- master bus width
-		s_bus_width: positive := 16; -- slave bus width
-		s_addr_width: positive := 20; -- master bus width
+		m_bus_width: positive;
+		m_addr_width: positive;
+		s_bus_width: positive;
+		s_addr_width: positive;
 		little_endien: boolean := true -- if set to false, big endien
 	);
 	port (
@@ -222,8 +232,8 @@ architecture vga_core of vga_core is
 	);
 	end component;
 
-	signal total: std_logic_vector(v_adr_width-1 downto 0);
-	signal offset: std_logic_vector(v_adr_width-1 downto 0);
+	signal v_mem_start: std_logic_vector(v_adr_width-1 downto 0);
+	signal v_mem_end: std_logic_vector(v_adr_width-1 downto 0);
 	
 	signal reg_bank: std_logic_vector((8*12)-1 downto 0);
 
@@ -242,18 +252,18 @@ architecture vga_core of vga_core is
 	alias sync_pol: std_logic_vector (3 downto 0)     is reg_bank(91 downto 88);
 	alias reset_core: std_logic_vector(0 downto 0)    is reg_bank(95 downto 95);
 
+    signal v_mem_start_stb: std_logic;    -- selects total register
+    signal v_mem_end_stb: std_logic;      -- selects offset register
+    signal reg_bank_stb: std_logic; -- selects all other registers (in a single bank)
+
 	signal reg_bank_do: std_logic_vector(cpu_dat_width-1 downto 0);
-	signal total_do: std_logic_vector(cpu_dat_width-1 downto 0);
-	signal ofs_do: std_logic_vector(cpu_dat_width-1 downto 0);
-	signal vm_do: std_logic_vector(cpu_dat_width-1 downto 0);
+	signal v_mem_start_do: std_logic_vector(cpu_dat_width-1 downto 0);
 
 	signal reg_bank_ack: std_logic;
-	signal total_ack: std_logic;
-	signal ofs_ack: std_logic;
-	signal vm_ack: std_logic;
+	signal v_mem_start_ack: std_logic;
 
 	signal a_adr_o : std_logic_vector((v_adr_width-1) downto 0);
-	signal a_sel_o : std_logic_vector((v_adr_width/8)-1 downto 0);
+	signal a_sel_o : std_logic_vector((v_dat_width/8)-1 downto 0);
 	signal a_dat_o : std_logic_vector((v_dat_width-1) downto 0);
 	signal a_dat_i : std_logic_vector((v_dat_width-1) downto 0);
 	signal a_we_o : std_logic;
@@ -262,7 +272,7 @@ architecture vga_core of vga_core is
 	signal a_ack_i : std_logic;
 
 	signal b_adr_o : std_logic_vector((v_adr_width-1) downto 0);
-	signal b_sel_o : std_logic_vector((v_adr_width/8)-1 downto 0);
+	signal b_sel_o : std_logic_vector((v_dat_width/8)-1 downto 0);
 --	signal b_dat_o : std_logic_vector((v_dat_width-1) downto 0);
 	signal b_dat_i : std_logic_vector((v_dat_width-1) downto 0);
 	signal b_stb_o : std_logic;
@@ -285,6 +295,8 @@ architecture vga_core of vga_core is
 	
 	constant v_adr_zero : std_logic_vector(v_adr_width-1 downto 0) := (others => '0');
 	constant reg_bank_rst_val: std_logic_vector(reg_bank'Range) := (others => '0');
+	constant reg_bank_size: integer := size2bits((reg_bank'HIGH+cpu_dat_width)/cpu_dat_width);
+	constant tot_ofs_size: integer := size2bits((v_adr_width+cpu_dat_width-1)/cpu_dat_width);
 begin
 	-- map all registers:
 --		adr_i: in std_logic_vector (max(log2((width+offset+bus_width-1)/bus_width)-1,0) downto 0) := (others => '0');
@@ -292,39 +304,39 @@ begin
 	reg_bank_reg: wb_out_reg
 		generic map( width => reg_bank'HIGH+1, bus_width => cpu_dat_width , offset => 0 )
 		port map(
-    		stb_i => reg_bank_stb_i,
+    		stb_i => reg_bank_stb,
     		q => reg_bank,
     		rst_val => reg_bank_rst_val,
-    		dat_oi => vm_do,
+    		dat_oi => reg_dat_oi,
     		dat_o => reg_bank_do,
-    		ack_oi => vm_ack,
+    		ack_oi => reg_ack_oi,
     		ack_o => reg_bank_ack,
-    		adr_i => adr_i(3 downto 0), -- range should be calculated !!!
-    		sel_i => sel_i, cyc_i => cyc_i, we_i => we_i, clk_i => clk_i, rst_i => rst_i, dat_i => dat_i );
-	ofs_reg: wb_out_reg
+    		adr_i => reg_adr_i(reg_bank_size-1 downto 0),
+    		sel_i => reg_sel_i, cyc_i => reg_cyc_i, we_i => reg_we_i, clk_i => clk_i, rst_i => rst_i, dat_i => reg_dat_i );
+	v_mem_start_reg: wb_out_reg
 		generic map( width => v_adr_width, bus_width => cpu_dat_width , offset => 0 )
 		port map(
-            stb_i => ofs_stb_i,
-            q => offset,
+            stb_i => v_mem_start_stb,
+            q => v_mem_start,
             rst_val => v_adr_zero,
             dat_oi => reg_bank_do,
-            dat_o => ofs_do,
+            dat_o => v_mem_start_do,
             ack_oi => reg_bank_ack,
-            ack_o => ofs_ack,
-    		adr_i => adr_i(1 downto 0), -- range should be calculated !!!
-    		sel_i => sel_i, cyc_i => cyc_i, we_i => we_i, clk_i => clk_i, rst_i => rst_i, dat_i => dat_i );
-	total_reg: wb_out_reg
+            ack_o => v_mem_start_ack,
+    		adr_i => reg_adr_i(tot_ofs_size-1 downto 0),
+    		sel_i => reg_sel_i, cyc_i => reg_cyc_i, we_i => reg_we_i, clk_i => clk_i, rst_i => rst_i, dat_i => reg_dat_i );
+	v_mem_end_reg: wb_out_reg
 		generic map( width => v_adr_width, bus_width => cpu_dat_width , offset => 0 )
 		port map(
-            stb_i => total_stb_i,
-            q => total,
+            stb_i => v_mem_end_stb,
+            q => v_mem_end,
             rst_val => v_adr_zero,
-            dat_oi => ofs_do,
-            dat_o => dat_o, -- END OF THE CHAIN
-            ack_oi => ofs_ack,
-            ack_o => ack_o, -- END OF THE CHAIN
-    		adr_i => adr_i(1 downto 0), -- range should be calculated !!!
-    		sel_i => sel_i, cyc_i => cyc_i, we_i => we_i, clk_i => clk_i, rst_i => rst_i, dat_i => dat_i );
+            dat_oi => v_mem_start_do,
+            dat_o => reg_dat_o, -- END OF THE CHAIN
+            ack_oi => v_mem_start_ack,
+            ack_o => reg_ack_o, -- END OF THE CHAIN
+    		adr_i => reg_adr_i(tot_ofs_size-1 downto 0),
+    		sel_i => reg_sel_i, cyc_i => reg_cyc_i, we_i => reg_we_i, clk_i => clk_i, rst_i => rst_i, dat_i => reg_dat_i );
 
     reset_engine <= rst_i or not reset_core(0);
 
@@ -334,7 +346,8 @@ begin
 			clk => clk_i,
 			clk_en => clk_en,
 			reset => reset_engine,
-			total => total,
+			v_mem_start => v_mem_start,
+			v_mem_end => v_mem_end,
 			fifo_treshold => fifo_treshold,
 			bpp => bpp,
 			multi_scan => multi_scan,
@@ -372,18 +385,18 @@ begin
 
 	resize: wb_bus_resize
 		generic map (
-			m_bus_width => cpu_dat_width, s_bus_width => v_dat_width, m_addr_width => cpu_adr_width
+			m_bus_width => cpu_dat_width, s_bus_width => v_dat_width, m_addr_width => cpu_adr_width, s_addr_width => v_adr_width, little_endien => true
 		)
 		port map (
-			m_adr_i => adr_i,
-			m_cyc_i => cyc_i,
-			m_sel_i => sel_i,
-			m_dat_i => dat_i,
-			m_dat_oi => dat_oi, -- Beginning of the chain
-			m_dat_o => vm_do,
-			m_ack_o => vm_ack,
-			m_ack_oi => ack_oi, -- Beginning of the chain
-			m_we_i => we_i,
+			m_adr_i => vmem_adr_i,
+			m_cyc_i => vmem_cyc_i,
+			m_sel_i => vmem_sel_i,
+			m_dat_i => vmem_dat_i,
+			m_dat_oi => vmem_dat_oi,
+			m_dat_o => vmem_dat_o,
+			m_ack_o => vmem_ack_o,
+			m_ack_oi => vmem_ack_oi, -- Beginning of the chain
+			m_we_i => vmem_we_i,
 			m_stb_i => vmem_stb_i,
 	
 			s_adr_o => a_adr_o,
@@ -443,5 +456,26 @@ begin
 		end if;
 	end process;
 
+	addr_decoder: process is
+	begin
+		wait on reg_stb_i, reg_adr_i;
+
+        v_mem_start_stb <= '0';
+        v_mem_end_stb <= '0';
+        reg_bank_stb <= '0';
+
+		if (reg_stb_i = '1') then
+			case (reg_adr_i(reg_bank_size)) is
+				when '0' => 
+        			case (reg_adr_i(reg_bank_size-2)) is
+        				when '0' => v_mem_end_stb <= '1';
+        				when '1' => v_mem_start_stb <= '1';
+        				when others => 
+        			end case;
+				when '1' => reg_bank_stb <= '1';
+				when others => 
+			end case;
+		end if;
+	end process;
 end vga_core;
 

@@ -24,7 +24,8 @@ entity mem_reader is
 		pix_clk_en: in std_logic;
 		reset: in std_logic := '0';
 		
-		total: in std_logic_vector(v_addr_width-1 downto 0);   -- total video memory size in bytes 7..0
+		v_mem_end: in std_logic_vector(v_addr_width-1 downto 0);   -- video memory end address in words
+		v_mem_start: in std_logic_vector(v_addr_width-1 downto 0) := (others => '0'); -- video memory start adderss in words
 		fifo_treshold: in std_logic_vector(7 downto 0);        -- priority change threshold
 		bpp: in std_logic_vector(1 downto 0);                  -- number of bits makes up a pixel valid values: 1,2,4,8
 		multi_scan: in std_logic_vector(1 downto 0);           -- number of repeated scans
@@ -175,14 +176,14 @@ begin
 	begin
 		wait until clk'EVENT and clk='1';
 		if (reset = '1') then
-			pixel_cnt := (others => '0');
+			pixel_cnt := v_mem_start;
 		else
 			-- A little cheet. It won't work with constant v_mem_rdy.
 			if (v_mem_rdy = '1') then
 				-- data is already written to the FIFO, all we need to do is to update the counter,
 				-- and remove the request
-				if (pixel_cnt = total) then
-					pixel_cnt := (others => '0');
+				if (pixel_cnt = v_mem_end) then
+					pixel_cnt := v_mem_start;
 				else
 					pixel_cnt := add_one(pixel_cnt);
 				end if;
